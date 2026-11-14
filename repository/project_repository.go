@@ -2,8 +2,9 @@ package repository
 
 import (
 	"context"
-	"gotask/entity"
 	"time"
+
+	"gotask/entity"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -11,93 +12,111 @@ import (
 )
 
 type ProjectRepository interface {
-	Create(project *entity.Project) error
-	GetByID(id primitive.ObjectID) (*entity.Project, error)
-	GetAll() ([]entity.Project, error)
-	GetByUserID(userID primitive.ObjectID) ([]entity.Project, error)
-	Update(project *entity.Project) error
-	Delete(id primitive.ObjectID) error
+	Create(ctx context.Context, project *entity.Project) error
+	FindByID(ctx context.Context, id string) (*entity.Project, error)
+	FindByIDs(ctx context.Context, ids []primitive.ObjectID) ([]entity.Project, error)
+	FindAll(ctx context.Context) ([]entity.Project, error)
+	FindByUser(ctx context.Context, userID string) ([]entity.Project, error)
+	Update(ctx context.Context, id string, project *entity.Project) error
+	Delete(ctx context.Context, id string) error
+	Count(ctx context.Context) (int64, error)
 }
 
 type projectRepository struct {
-	col       *mongo.Collection
-	memberCol *mongo.Collection
+	col *mongo.Collection
 }
 
 func NewProjectRepository(db *mongo.Database) ProjectRepository {
-	return &projectRepository{
-		col:       db.Collection("projects"),
-		memberCol: db.Collection("project_members"),
-	}
+	return &projectRepository{col: db.Collection("projects")}
 }
 
-func (r *projectRepository) Create(project *entity.Project) error {
+func (r *projectRepository) Create(ctx context.Context, project *entity.Project) error {
 	project.ID = primitive.NewObjectID()
 	project.CreatedAt = time.Now()
 	project.UpdatedAt = time.Now()
-	_, err := r.col.InsertOne(context.Background(), project)
+	_, err := r.col.InsertOne(ctx, project)
 	return err
 }
 
-func (r *projectRepository) GetByID(id primitive.ObjectID) (*entity.Project, error) {
+func (r *projectRepository) FindByID(ctx context.Context, id string) (*entity.Project, error) {
+	oid, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return nil, nil
+	}
 	var project entity.Project
-	err := r.col.FindOne(context.Background(), bson.M{"_id": id}).Decode(&project)
+	err = r.col.FindOne(ctx, bson.M{"_id": oid}).Decode(&project)
+	if err == mongo.ErrNoDocuments {
+		return nil, nil
+	}
 	return &project, err
 }
 
-func (r *projectRepository) GetAll() ([]entity.Project, error) {
-	cursor, err := r.col.Find(context.Background(), bson.M{})
+func (r *projectRepository) FindByIDs(ctx context.Context, ids []primitive.ObjectID) ([]entity.Project, error) {
+	cursor, err := r.col.Find(ctx, bson.M{"_id": bson.M{"$in": ids}})
 	if err != nil {
 		return nil, err
 	}
+	defer cursor.Close(ctx)
+
 	var projects []entity.Project
-	if err := cursor.All(context.Background(), &projects); err != nil {
+	if err := cursor.All(ctx, &projects); err != nil {
 		return nil, err
 	}
 	return projects, nil
 }
 
-func (r *projectRepository) GetByUserID(userID primitive.ObjectID) ([]entity.Project, error) {
-	// Cari project yang dibuat user atau user jadi member
-	memberCursor, err := r.memberCol.Find(context.Background(), bson.M{"user_id": userID})
+func (r *projectRepository) FindAll(ctx context.Context) ([]entity.Project, error) {
+	cursor, err := r.col.Find(ctx, bson.M{})
 	if err != nil {
 		return nil, err
 	}
-	var members []entity.ProjectMember
-	if err := memberCursor.All(context.Background(), &members); err != nil {
-		return nil, err
-	}
+	defer cursor.Close(ctx)
 
-	projectIDs := []primitive.ObjectID{}
-	for _, m := range members {
-		projectIDs = append(projectIDs, m.ProjectID)
-	}
-
-	filter := bson.M{
-		"$or": []bson.M{
-			{"created_by": userID},
-			{"_id": bson.M{"$in": projectIDs}},
-		},
-	}
-
-	cursor, err := r.col.Find(context.Background(), filter)
-	if err != nil {
-		return nil, err
-	}
 	var projects []entity.Project
-	if err := cursor.All(context.Background(), &projects); err != nil {
+	if err := cursor.All(ctx, &projects); err != nil {
 		return nil, err
 	}
 	return projects, nil
 }
 
-func (r *projectRepository) Update(project *entity.Project) error {
+func (r *projectRepository) FindByUser(ctx context.Context, userID string) ([]entity.Project, error) {
+	oid, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return nil, nil
+	}
+	cursor, err := r.col.Find(ctx, bson.M{"created_by": oid})
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var projects []entity.Project
+	if err := cursor.All(ctx, &projects); err != nil {
+		return nil, err
+	}
+	return projects, nil
+}
+
+func (r *projectRepository) Update(ctx context.Context, id string, project *entity.Project) error {
+	oid, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return err
+	}
+	project.ID = oid
 	project.UpdatedAt = time.Now()
-	_, err := r.col.ReplaceOne(context.Background(), bson.M{"_id": project.ID}, project)
+	_, err = r.col.ReplaceOne(ctx, bson.M{"_id": oid}, project)
 	return err
 }
 
-func (r *projectRepository) Delete(id primitive.ObjectID) error {
-	_, err := r.col.DeleteOne(context.Background(), bson.M{"_id": id})
+func (r *projectRepository) Delete(ctx context.Context, id string) error {
+	oid, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return err
+	}
+	_, err = r.col.DeleteOne(ctx, bson.M{"_id": oid})
 	return err
+}
+
+func (r *projectRepository) Count(ctx context.Context) (int64, error) {
+	return r.col.CountDocuments(ctx, bson.M{})
 }

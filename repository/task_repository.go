@@ -2,8 +2,9 @@ package repository
 
 import (
 	"context"
-	"gotask/entity"
 	"time"
+
+	"gotask/entity"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -11,114 +12,130 @@ import (
 )
 
 type TaskRepository interface {
-	Create(task *entity.Task) error
-	GetByID(id primitive.ObjectID) (*entity.Task, error)
-	GetByProjectID(projectID primitive.ObjectID) ([]entity.Task, error)
-	GetByAssignedTo(userID primitive.ObjectID) ([]entity.Task, error)
-	Update(task *entity.Task) error
-	Delete(id primitive.ObjectID) error
-	CountByStatus(userID primitive.ObjectID) (total, todo, inProgress, done int64, err error)
-	CountProjectsByUser(userID primitive.ObjectID) (int64, error)
+	Create(ctx context.Context, task *entity.Task) error
+	FindByID(ctx context.Context, id string) (*entity.Task, error)
+	FindByProjectID(ctx context.Context, projectID string) ([]entity.Task, error)
+	FindByAssignedTo(ctx context.Context, userID string) ([]entity.Task, error)
+	Update(ctx context.Context, id string, task *entity.Task) error
+	UpdateStatus(ctx context.Context, id string, status entity.TaskStatus) error
+	Delete(ctx context.Context, id string) error
+	DeleteByProjectID(ctx context.Context, projectID string) error
+	Count(ctx context.Context) (int64, error)
+	CountByStatus(ctx context.Context, status entity.TaskStatus) (int64, error)
 }
 
 type taskRepository struct {
-	col        *mongo.Collection
-	projectCol *mongo.Collection
-	memberCol  *mongo.Collection
+	col *mongo.Collection
 }
 
 func NewTaskRepository(db *mongo.Database) TaskRepository {
-	return &taskRepository{
-		col:        db.Collection("tasks"),
-		projectCol: db.Collection("projects"),
-		memberCol:  db.Collection("project_members"),
-	}
+	return &taskRepository{col: db.Collection("tasks")}
 }
 
-func (r *taskRepository) Create(task *entity.Task) error {
+func (r *taskRepository) Create(ctx context.Context, task *entity.Task) error {
 	task.ID = primitive.NewObjectID()
 	task.CreatedAt = time.Now()
 	task.UpdatedAt = time.Now()
-	_, err := r.col.InsertOne(context.Background(), task)
+	_, err := r.col.InsertOne(ctx, task)
 	return err
 }
 
-func (r *taskRepository) GetByID(id primitive.ObjectID) (*entity.Task, error) {
+func (r *taskRepository) FindByID(ctx context.Context, id string) (*entity.Task, error) {
+	oid, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return nil, nil
+	}
 	var task entity.Task
-	err := r.col.FindOne(context.Background(), bson.M{"_id": id}).Decode(&task)
+	err = r.col.FindOne(ctx, bson.M{"_id": oid}).Decode(&task)
+	if err == mongo.ErrNoDocuments {
+		return nil, nil
+	}
 	return &task, err
 }
 
-func (r *taskRepository) GetByProjectID(projectID primitive.ObjectID) ([]entity.Task, error) {
-	cursor, err := r.col.Find(context.Background(), bson.M{"project_id": projectID})
+func (r *taskRepository) FindByProjectID(ctx context.Context, projectID string) ([]entity.Task, error) {
+	pID, err := primitive.ObjectIDFromHex(projectID)
+	if err != nil {
+		return nil, nil
+	}
+	cursor, err := r.col.Find(ctx, bson.M{"project_id": pID})
 	if err != nil {
 		return nil, err
 	}
+	defer cursor.Close(ctx)
+
 	var tasks []entity.Task
-	if err := cursor.All(context.Background(), &tasks); err != nil {
+	if err := cursor.All(ctx, &tasks); err != nil {
 		return nil, err
 	}
 	return tasks, nil
 }
 
-func (r *taskRepository) GetByAssignedTo(userID primitive.ObjectID) ([]entity.Task, error) {
-	cursor, err := r.col.Find(context.Background(), bson.M{"assigned_to": userID})
+func (r *taskRepository) FindByAssignedTo(ctx context.Context, userID string) ([]entity.Task, error) {
+	uID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return nil, nil
+	}
+	cursor, err := r.col.Find(ctx, bson.M{"assigned_to": uID})
 	if err != nil {
 		return nil, err
 	}
+	defer cursor.Close(ctx)
+
 	var tasks []entity.Task
-	if err := cursor.All(context.Background(), &tasks); err != nil {
+	if err := cursor.All(ctx, &tasks); err != nil {
 		return nil, err
 	}
 	return tasks, nil
 }
 
-func (r *taskRepository) Update(task *entity.Task) error {
+func (r *taskRepository) Update(ctx context.Context, id string, task *entity.Task) error {
+	oid, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return err
+	}
+	task.ID = oid
 	task.UpdatedAt = time.Now()
-	_, err := r.col.ReplaceOne(context.Background(), bson.M{"_id": task.ID}, task)
+	_, err = r.col.ReplaceOne(ctx, bson.M{"_id": oid}, task)
 	return err
 }
 
-func (r *taskRepository) Delete(id primitive.ObjectID) error {
-	_, err := r.col.DeleteOne(context.Background(), bson.M{"_id": id})
+func (r *taskRepository) UpdateStatus(ctx context.Context, id string, status entity.TaskStatus) error {
+	oid, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return err
+	}
+	_, err = r.col.UpdateOne(ctx, bson.M{"_id": oid}, bson.M{
+		"$set": bson.M{
+			"status":     status,
+			"updated_at": time.Now(),
+		},
+	})
 	return err
 }
 
-func (r *taskRepository) CountByStatus(userID primitive.ObjectID) (total, todo, inProgress, done int64, err error) {
-	ctx := context.Background()
-	filter := bson.M{"assigned_to": userID}
-
-	total, err = r.col.CountDocuments(ctx, filter)
+func (r *taskRepository) Delete(ctx context.Context, id string) error {
+	oid, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
-		return
+		return err
 	}
-	todo, err = r.col.CountDocuments(ctx, bson.M{"assigned_to": userID, "status": entity.StatusTodo})
-	if err != nil {
-		return
-	}
-	inProgress, err = r.col.CountDocuments(ctx, bson.M{"assigned_to": userID, "status": entity.StatusInProgress})
-	if err != nil {
-		return
-	}
-	done, err = r.col.CountDocuments(ctx, bson.M{"assigned_to": userID, "status": entity.StatusDone})
-	return
+	_, err = r.col.DeleteOne(ctx, bson.M{"_id": oid})
+	return err
 }
 
-func (r *taskRepository) CountProjectsByUser(userID primitive.ObjectID) (int64, error) {
-	ctx := context.Background()
-
-	// Hitung project yang dibuat user
-	createdCount, err := r.projectCol.CountDocuments(ctx, bson.M{"created_by": userID})
+func (r *taskRepository) DeleteByProjectID(ctx context.Context, projectID string) error {
+	pID, err := primitive.ObjectIDFromHex(projectID)
 	if err != nil {
-		return 0, err
+		return err
 	}
+	_, err = r.col.DeleteMany(ctx, bson.M{"project_id": pID})
+	return err
+}
 
-	// Hitung project yang user jadi member
-	memberCount, err := r.memberCol.CountDocuments(ctx, bson.M{"user_id": userID})
-	if err != nil {
-		return 0, err
-	}
+func (r *taskRepository) Count(ctx context.Context) (int64, error) {
+	return r.col.CountDocuments(ctx, bson.M{})
+}
 
-	// ponytail: bisa overlap jika creator juga member, upgrade ke aggregation $lookup + $group jika perlu exact count
-	return createdCount + memberCount, nil
+func (r *taskRepository) CountByStatus(ctx context.Context, status entity.TaskStatus) (int64, error) {
+	return r.col.CountDocuments(ctx, bson.M{"status": status})
 }
