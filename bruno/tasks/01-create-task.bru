@@ -1,0 +1,32 @@
+meta {
+  name: Create Task
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/projects/{{projectId}}/tasks
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "title": "Implementasi endpoint login",
+    "description": "Buat endpoint POST /api/login dengan JWT",
+    "priority": "high",
+    "assigned_to": "{{memberId}}",
+    "deadline": "2026-12-01T17:00:00Z"
+  }
+}
+
+script:post-response {
+  const data = res.getBody().data;
+  if (data && data.id) {
+    bru.setEnvVar("taskId", data.id);
+  }
+}

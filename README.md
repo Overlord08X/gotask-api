@@ -45,6 +45,24 @@ go run main.go
 | `JWT_SECRET` | `your-secret-key` | Kunci penandatangan JWT |
 | `APP_PORT` | `8080` | Port server |
 
+## Testing dengan Bruno
+
+Collection Bruno tersedia di folder `bruno/`.
+
+1. Buka aplikasi Bruno → **Open Collection**
+2. Pilih folder `bruno/` di repo ini
+3. Pilih environment **Local** (pojok kanan atas)
+4. Jalankan berurutan: `Auth > Register` → `Auth > Login` → sisanya
+
+Token, `userId`, `projectId`, dan `taskId` tersimpan otomatis ke environment setelah request tertentu berhasil. Isi `memberId` manual dengan id user lain (hasil `Register` kedua).
+
+Atau lewat CLI:
+
+```bash
+cd bruno
+bru run --env Local
+```
+
 ## API Endpoints
 
 Semua endpoint terproteksi memerlukan header:

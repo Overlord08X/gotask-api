@@ -1,0 +1,24 @@
+meta {
+  name: Update Task
+  type: http
+  seq: 5
+}
+
+put {
+  url: {{baseUrl}}/api/tasks/{{taskId}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "title": "Implementasi endpoint login (revisi)",
+    "description": "Tambahkan validasi input",
+    "priority": "medium",
+    "status": "in_progress"
+  }
+}

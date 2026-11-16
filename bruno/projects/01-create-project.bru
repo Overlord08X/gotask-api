@@ -1,0 +1,29 @@
+meta {
+  name: Create Project
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/projects
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "name": "Proyek Demo",
+    "description": "Proyek untuk pengujian endpoint"
+  }
+}
+
+script:post-response {
+  const data = res.getBody().data;
+  if (data && data.id) {
+    bru.setEnvVar("projectId", data.id);
+  }
+}

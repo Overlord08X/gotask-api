@@ -1,0 +1,15 @@
+meta {
+  name: List Tasks by Project
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/projects/{{projectId}}/tasks
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}

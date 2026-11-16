@@ -1,0 +1,29 @@
+headers {
+  Content-Type: application/json
+}
+
+docs {
+  # GoTask API
+
+  Base URL: http://localhost:8080
+
+  ## Alur testing
+  1. Jalankan `docker compose up --build`
+  2. Jalankan request **Auth > Register** (admin), lalu **Auth > Login**
+     - Token otomatis tersimpan ke environment variable `token`
+  3. Register user kedua dengan role `manager` atau `member`
+  4. Copy id user tersebut ke environment variable `memberId`
+  5. Jalankan request Projects > Create, lalu Tasks > Create
+     - `projectId` dan `taskId` otomatis tersimpan
+
+  ## Environment variable
+  | Variable | Diisi oleh |
+  |---|---|
+  | baseUrl | manual (default http://localhost:8080) |
+  | email / password | manual, untuk login |
+  | token | otomatis dari Login |
+  | userId | otomatis dari Login |
+  | memberId | manual, id user lain |
+  | projectId | otomatis dari Projects > Create |
+  | taskId | otomatis dari Tasks > Create |
+}

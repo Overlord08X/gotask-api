@@ -1,0 +1,20 @@
+meta {
+  name: Register
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/register
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "name": "Admin GoTask",
+    "email": "admin@gotask.test",
+    "password": "admin123",
+    "role": "admin"
+  }
+}
