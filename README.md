@@ -8,7 +8,7 @@ Sistem manajemen tugas berbasis web backend yang dibangun dengan Go menggunakan 
 - **MongoDB Go Driver** - Database driver
 - **MongoDB** - Database
 - **JWT** - Autentikasi
-- **UUID** - Primary key
+- **ObjectID** - Primary key (MongoDB `_id`)
 
 ## Struktur Project (Clean Architecture)
 ```
@@ -26,24 +26,45 @@ Sistem manajemen tugas berbasis web backend yang dibangun dengan Go menggunakan 
 ```bash
 docker compose up --build
 ```
-Server jalan di `http://localhost:8080`, PostgreSQL di port `5432`.
+Server jalan di `http://localhost:8080`, MongoDB di port `27017`.
 
 ### Tanpa Docker
 1. Copy `.env.example` ke `.env` dan sesuaikan konfigurasi
-2. Buat database PostgreSQL `gotask`
+2. Jalankan MongoDB lokal (atau `docker compose up mongo`)
 3. Jalankan:
 ```bash
 go mod tidy
 go run main.go
 ```
 
+### Variabel Lingkungan
+| Variabel | Default | Keterangan |
+|---|---|---|
+| `MONGO_URI` | `mongodb://localhost:27017` | Connection string MongoDB |
+| `MONGO_DB` | `gotask` | Nama database |
+| `JWT_SECRET` | `your-secret-key` | Kunci penandatangan JWT |
+| `APP_PORT` | `8080` | Port server |
+
 ## API Endpoints
+
+Semua endpoint terproteksi memerlukan header:
+```
+Authorization: Bearer <token>
+```
+
+### Role
+| Role | Hak Akses |
+|---|---|
+| `admin` | Seluruh data sistem |
+| `manager` | Proyek dan task miliknya, kelola member |
+| `member` | Proyek yang diikuti, update status task sendiri |
 
 ### Public
 | Method | Endpoint | Deskripsi |
 |--------|----------|-----------|
 | POST | `/api/register` | Register user baru |
-| POST | `/api/login` | Login |
+| POST | `/api/login` | Login, mengembalikan token JWT |
+| GET | `/api/health` | Cek status service |
 
 ### User (Auth required)
 | Method | Endpoint | Role | Deskripsi |

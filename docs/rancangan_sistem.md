@@ -163,65 +163,77 @@ users 1───N tasks             (created_by → menyimpan users._id)
 
 ## 6. Pembagian Kerja
 
-### Anggota A — Git Master
-- Setup project (init repo, struktur folder, config)
-- Autentikasi: register & login
-- Entity, Repository, Service untuk `User`
-- Middleware JWT
-
-### Anggota B
-- Entity, Repository, Service untuk `Project`
-- Manajemen Project Member (assign/remove member)
-
-### Anggota C
-- Entity, Repository, Service untuk `Task`
-- Status tracking (update status task)
-- Dashboard (ringkasan project & task per status)
+| Anggota | Peran Utama | Tanggung Jawab Kode |
+|---|---|---|
+| **Raihan Zulfa Kamal** (434241096) | Git Master & Core Architecture | Inisialisasi repo, `go.mod`, struktur folder, `entity/`, `config/database.go`, `middleware/auth.go`, `Dockerfile`, `docker-compose.yml`, review PR, merge ke `main` |
+| **Ody Dzakwan Berwin** (434241100) | Repository Layer & System Analyst | Seluruh file `repository/` (interface + implementasi query MongoDB) |
+| **Muhammad Fadhil Ilyas** (434241099) | Usecase Layer & Lead Documentation | Seluruh file `service/`, `dto/`, wiring `main.go`, kompilasi laporan akhir |
 
 ---
 
 ## 7. Struktur Folder (Clean Architecture)
 
+Sesuai kesepakatan modul, tidak ada layer `controller` atau `handler`. Wiring rute HTTP dilakukan langsung di `main.go`.
+
 ```
-.
-├── cmd/
-│   └── main.go                 # Entry point
-├── internal/
-│   ├── entity/                 # Domain entities
-│   │   ├── user.go
-│   │   ├── project.go
-│   │   ├── project_member.go
-│   │   └── task.go
-│   ├── repository/             # Interface & implementasi akses data
-│   │   ├── user_repository.go
-│   │   ├── project_repository.go
-│   │   ├── project_member_repository.go
-│   │   └── task_repository.go
-│   ├── service/                # Business logic
-│   │   ├── auth_service.go
-│   │   ├── user_service.go
-│   │   ├── project_service.go
-│   │   ├── project_member_service.go
-│   │   ├── task_service.go
-│   │   └── dashboard_service.go
-│   ├── dto/                    # Request & response struct
-│   │   ├── auth_dto.go
-│   │   ├── user_dto.go
-│   │   ├── project_dto.go
-│   │   ├── task_dto.go
-│   │   └── dashboard_dto.go
-│   ├── handler/                # HTTP handler (Gin)
-│   │   ├── auth_handler.go
-│   │   ├── user_handler.go
-│   │   ├── project_handler.go
-│   │   ├── task_handler.go
-│   │   └── dashboard_handler.go
-│   └── middleware/             # JWT auth middleware
-│       └── auth_middleware.go
+gotask-api/
+├── entity/                         # Domain entity + enum
+│   ├── user.go                     # User, Role
+│   ├── project.go                  # Project, ProjectMember
+│   └── task.go                     # Task, TaskStatus, TaskPriority
+├── repository/                     # Interface + implementasi MongoDB
+│   ├── user_repository.go
+│   ├── project_repository.go
+│   ├── project_member_repository.go
+│   └── task_repository.go
+├── service/                        # Logika bisnis (usecase)
+│   ├── user_service.go
+│   ├── project_service.go
+│   └── task_service.go
+├── dto/                            # Request & response payload
+│   ├── user_dto.go
+│   ├── project_dto.go
+│   └── task_dto.go
 ├── config/
-│   └── config.go               # Konfigurasi MongoDB, JWT secret, dll
+│   └── database.go                 # Koneksi MongoDB
+├── middleware/
+│   └── auth.go                     # Verifikasi JWT + otorisasi role
 ├── docs/
 │   └── rancangan_sistem.md
+├── Dockerfile
+├── docker-compose.yml
+├── .env.example
 ├── go.mod
-└── go.sum
+├── main.go                         # Entry point, DI, routing
+└── README.md
 ```
+
+---
+
+## 8. Daftar Endpoint REST API
+
+| Method | Endpoint | Akses |
+|---|---|---|
+| POST | `/api/register` | Public |
+| POST | `/api/login` | Public |
+| GET | `/api/health` | Public |
+| GET | `/api/users` | Admin |
+| GET | `/api/users/:id` | Authenticated |
+| PUT | `/api/users/:id` | Self / Admin |
+| DELETE | `/api/users/:id` | Admin |
+| POST | `/api/projects` | Admin, Manager |
+| GET | `/api/projects` | Authenticated |
+| GET | `/api/projects/:id` | Authenticated |
+| PUT | `/api/projects/:id` | Owner, Admin |
+| DELETE | `/api/projects/:id` | Owner, Admin |
+| POST | `/api/projects/:id/members` | Owner, Admin |
+| GET | `/api/projects/:id/members` | Authenticated |
+| DELETE | `/api/projects/:id/members/:user_id` | Owner, Admin |
+| POST | `/api/projects/:id/tasks` | Owner, Admin |
+| GET | `/api/projects/:id/tasks` | Authenticated |
+| GET | `/api/tasks/me` | Authenticated |
+| GET | `/api/tasks/:id` | Authenticated |
+| PUT | `/api/tasks/:id` | Creator, Admin |
+| PATCH | `/api/tasks/:id/status` | Assignee, Creator, Admin |
+| DELETE | `/api/tasks/:id` | Creator, Admin |
+| GET | `/api/dashboard` | Authenticated |
